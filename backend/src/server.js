@@ -17,14 +17,13 @@ const app = express();
 /* ======================
    MIDDLEWARE
 ====================== */
-app.set("trust proxy", 1); // ✅ helpful on Render / reverse proxies
+app.set("trust proxy", 1);
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan("dev"));
 
 /* ======================
    HEALTH CHECK
-   Test: https://YOUR-BACKEND.onrender.com/health
 ====================== */
 app.get("/health", (req, res) => {
   res.status(200).json({ ok: true, message: "Backend is healthy ✅" });
@@ -49,34 +48,23 @@ try {
 app.use("/uploads", express.static(uploadsDir));
 
 /* ======================
-   CORS (FIXED FOR NETLIFY + PREVIEW URLS)
-   - Allows localhost in dev
-   - Allows any *.netlify.app (preview links)
-   - Allows extra custom domains via FRONTEND_URL (comma-separated)
-   - Removes trailing slash issues
+   CORS (NETLIFY + PREVIEW SAFE)
 ====================== */
 const allowedOrigins = new Set();
 
 if (process.env.FRONTEND_URL) {
   process.env.FRONTEND_URL
     .split(",")
-    .map((u) => u.trim().replace(/\/$/, "")) // ✅ remove trailing slash
+    .map((u) => u.trim().replace(/\/$/, "")) // remove trailing slash
     .filter(Boolean)
     .forEach((u) => allowedOrigins.add(u));
 }
 
 function isAllowedOrigin(origin) {
-  // Allow Postman/curl/no-origin
-  if (!origin) return true;
-
-  // Allow localhost dev
-  if (origin.startsWith("http://localhost")) return true;
-
-  // ✅ Allow Netlify preview + main domains
-  if (origin.endsWith(".netlify.app")) return true;
-
-  // Allow explicitly listed origins
-  return allowedOrigins.has(origin);
+  if (!origin) return true; // Postman/curl/no-origin
+  if (origin.startsWith("http://localhost")) return true; // dev
+  if (origin.endsWith(".netlify.app")) return true; // ✅ allow all netlify preview domains
+  return allowedOrigins.has(origin); // allow explicit domains
 }
 
 const corsOptions = {
@@ -91,8 +79,13 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 
-// ✅ IMPORTANT: handle preflight requests
-app.options("*", cors(corsOptions));
+/* ✅ Preflight handler (FIXED — no "*") */
+app.use((req, res, next) => {
+  if (req.method === "OPTIONS") {
+    return cors(corsOptions)(req, res, () => res.sendStatus(204));
+  }
+  next();
+});
 
 /* ======================
    ROUTES
@@ -116,14 +109,12 @@ app.use((req, res) => {
 app.use((err, req, res, next) => {
   console.error("❌ Error:", err.message);
 
-  // If multer throws file errors, return 400 (better than 500)
   const isMulter =
     err.name === "MulterError" ||
     String(err.message || "").toLowerCase().includes("only images") ||
     String(err.message || "").toLowerCase().includes("only images/videos") ||
     String(err.message || "").toLowerCase().includes("file too large");
 
-  // If it's a CORS block error, return 403 (clearer)
   const isCors = String(err.message || "").toLowerCase().includes("cors blocked");
 
   const status = isCors ? 403 : isMulter ? 400 : 500;
