@@ -23,8 +23,8 @@ app.use(express.urlencoded({ extended: true }));
 app.use(morgan("dev"));
 
 /* ======================
-   HEALTH CHECK (VERY IMPORTANT)
-   Test: https://your-backend.onrender.com/health
+   HEALTH CHECK
+   Test: https://YOUR-BACKEND.onrender.com/health
 ====================== */
 app.get("/health", (req, res) => {
   res.status(200).json({ ok: true, message: "Backend is healthy ✅" });
@@ -49,40 +49,50 @@ try {
 app.use("/uploads", express.static(uploadsDir));
 
 /* ======================
-   CORS
-   FRONTEND_URL can be:
-   FRONTEND_URL="https://a.netlify.app,https://b.netlify.app"
+   CORS (FIXED FOR NETLIFY + PREVIEW URLS)
+   - Allows localhost in dev
+   - Allows any *.netlify.app (preview links)
+   - Allows extra custom domains via FRONTEND_URL (comma-separated)
+   - Removes trailing slash issues
 ====================== */
 const allowedOrigins = new Set();
 
 if (process.env.FRONTEND_URL) {
   process.env.FRONTEND_URL
     .split(",")
-    .map((u) => u.trim())
+    .map((u) => u.trim().replace(/\/$/, "")) // ✅ remove trailing slash
     .filter(Boolean)
     .forEach((u) => allowedOrigins.add(u));
 }
 
-app.use(
-  cors({
-    origin: (origin, cb) => {
-      if (!origin) return cb(null, true); // Postman/curl
+function isAllowedOrigin(origin) {
+  // Allow Postman/curl/no-origin
+  if (!origin) return true;
 
-      if (origin.startsWith("http://localhost")) return cb(null, true);
+  // Allow localhost dev
+  if (origin.startsWith("http://localhost")) return true;
 
-      if (allowedOrigins.size === 0) {
-        // ✅ If you forgot FRONTEND_URL, don't break everything:
-        console.warn("⚠️ FRONTEND_URL not set. CORS allowing this origin:", origin);
-        return cb(null, true);
-      }
+  // ✅ Allow Netlify preview + main domains
+  if (origin.endsWith(".netlify.app")) return true;
 
-      if (allowedOrigins.has(origin)) return cb(null, true);
+  // Allow explicitly listed origins
+  return allowedOrigins.has(origin);
+}
 
-      return cb(new Error("CORS blocked: " + origin));
-    },
-    credentials: true,
-  })
-);
+const corsOptions = {
+  origin: (origin, cb) => {
+    if (isAllowedOrigin(origin)) return cb(null, true);
+    return cb(new Error("CORS blocked: " + origin));
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+};
+
+app.use(cors(corsOptions));
+
+// ✅ IMPORTANT: handle preflight requests
+app.options("*", cors(corsOptions));
 
 /* ======================
    ROUTES
@@ -106,13 +116,17 @@ app.use((req, res) => {
 app.use((err, req, res, next) => {
   console.error("❌ Error:", err.message);
 
+  // If multer throws file errors, return 400 (better than 500)
   const isMulter =
     err.name === "MulterError" ||
     String(err.message || "").toLowerCase().includes("only images") ||
     String(err.message || "").toLowerCase().includes("only images/videos") ||
     String(err.message || "").toLowerCase().includes("file too large");
 
-  const status = isMulter ? 400 : 500;
+  // If it's a CORS block error, return 403 (clearer)
+  const isCors = String(err.message || "").toLowerCase().includes("cors blocked");
+
+  const status = isCors ? 403 : isMulter ? 400 : 500;
   res.status(status).json({ ok: false, message: err.message });
 });
 
