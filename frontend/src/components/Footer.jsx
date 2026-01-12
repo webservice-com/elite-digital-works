@@ -159,12 +159,6 @@ export default function Footer() {
             {/* Contact Info */}
             <div className="text-center md:text-right">
               <div className="flex flex-col gap-2">
-                <a 
-                  href="tel:+94702742696" 
-                  className="text-slate-300 hover:text-white transition-colors duration-300 font-medium"
-                >
-                  📞 +94 70 274 2696
-                </a>
               </div>
             </div>
           </div>
