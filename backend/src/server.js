@@ -48,7 +48,7 @@ try {
 app.use("/uploads", express.static(uploadsDir));
 
 /* ======================
-   CORS (NETLIFY + PREVIEW SAFE)
+   CORS (NETLIFY + CLOUDFLARE PAGES + CUSTOM)
 ====================== */
 const allowedOrigins = new Set();
 
@@ -60,11 +60,26 @@ if (process.env.FRONTEND_URL) {
     .forEach((u) => allowedOrigins.add(u));
 }
 
+function normalizeOrigin(origin) {
+  return String(origin || "").replace(/\/$/, "");
+}
+
 function isAllowedOrigin(origin) {
   if (!origin) return true; // Postman/curl/no-origin
-  if (origin.startsWith("http://localhost")) return true; // dev
-  if (origin.endsWith(".netlify.app")) return true; // ✅ allow all netlify preview domains
-  return allowedOrigins.has(origin); // allow explicit domains
+
+  const o = normalizeOrigin(origin);
+
+  // dev
+  if (o.startsWith("http://localhost") || o.startsWith("http://127.0.0.1")) return true;
+
+  // ✅ allow all netlify preview domains
+  if (o.endsWith(".netlify.app")) return true;
+
+  // ✅ allow all Cloudflare Pages domains
+  if (o.endsWith(".pages.dev")) return true;
+
+  // allow explicit domains from FRONTEND_URL
+  return allowedOrigins.has(o);
 }
 
 const corsOptions = {
@@ -79,13 +94,8 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 
-/* ✅ Preflight handler (FIXED — no "*") */
-app.use((req, res, next) => {
-  if (req.method === "OPTIONS") {
-    return cors(corsOptions)(req, res, () => res.sendStatus(204));
-  }
-  next();
-});
+// ✅ Preflight handler (clean)
+app.options("*", cors(corsOptions));
 
 /* ======================
    ROUTES
@@ -109,13 +119,15 @@ app.use((req, res) => {
 app.use((err, req, res, next) => {
   console.error("❌ Error:", err.message);
 
+  const msg = String(err.message || "").toLowerCase();
+
   const isMulter =
     err.name === "MulterError" ||
-    String(err.message || "").toLowerCase().includes("only images") ||
-    String(err.message || "").toLowerCase().includes("only images/videos") ||
-    String(err.message || "").toLowerCase().includes("file too large");
+    msg.includes("only images") ||
+    msg.includes("only images/videos") ||
+    msg.includes("file too large");
 
-  const isCors = String(err.message || "").toLowerCase().includes("cors blocked");
+  const isCors = msg.includes("cors blocked");
 
   const status = isCors ? 403 : isMulter ? 400 : 500;
   res.status(status).json({ ok: false, message: err.message });
@@ -131,6 +143,7 @@ async function start() {
     console.log(`✅ Backend running on PORT: ${PORT}`);
     console.log(`✅ Health: /health`);
     console.log(`✅ Uploads served at: /uploads`);
+    console.log(`✅ FRONTEND_URL: ${process.env.FRONTEND_URL || "(not set)"}`);
   });
 
   try {
