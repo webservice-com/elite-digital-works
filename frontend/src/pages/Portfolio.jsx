@@ -1,22 +1,13 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { api } from "../lib/api";
+import { api, API_BASE } from "../lib/api";
 
-// ✅ Use the SAME env variable everywhere
-// In Cloudflare Pages set: VITE_API_URL = https://your-backend.onrender.com
-const API_BASE = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
-
-// ✅ Resolve media URLs coming from backend (e.g. "/uploads/xyz.jpg")
+/* ✅ Resolve media URLs coming from backend (e.g. "/uploads/xyz.jpg") */
 function resolveUrl(u) {
   if (!u) return "";
   if (u.startsWith("http://") || u.startsWith("https://")) return u;
 
-  // If API_BASE is missing in production, return original path (won't crash)
-  // but images won't load until env is fixed.
-  if (!API_BASE) return u;
-
-  // Ensure u starts with /
   const clean = u.startsWith("/") ? u : `/${u}`;
-  return `${API_BASE}${clean}`;
+  return API_BASE ? `${API_BASE}${clean}` : clean;
 }
 
 /* =========================
@@ -44,7 +35,9 @@ function GalleryModal({ open, onClose, title, images = [], index = 0, setIndex }
         <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-slate-800 to-slate-900 border-b border-slate-700">
           <div>
             <p className="font-bold text-white">{title || "Preview"}</p>
-            <p className="text-xs text-slate-300">{total ? `Image ${clampedIndex + 1} of ${total}` : "No images"}</p>
+            <p className="text-xs text-slate-300">
+              {total ? `Image ${clampedIndex + 1} of ${total}` : "No images"}
+            </p>
           </div>
 
           <div className="flex items-center gap-2">
@@ -79,9 +72,16 @@ function GalleryModal({ open, onClose, title, images = [], index = 0, setIndex }
         <div className="bg-gradient-to-br from-slate-800 to-slate-900 p-6">
           <div className="relative rounded-xl overflow-hidden bg-slate-900">
             {currentSrc ? (
-              <img src={currentSrc} alt="preview" className="w-full max-h-[70vh] object-contain" loading="lazy" />
+              <img
+                src={currentSrc}
+                alt="preview"
+                className="w-full max-h-[70vh] object-contain"
+                loading="lazy"
+              />
             ) : (
-              <div className="h-[40vh] flex items-center justify-center text-slate-300">No images to preview</div>
+              <div className="h-[40vh] flex items-center justify-center text-slate-300">
+                No images to preview
+              </div>
             )}
           </div>
 
@@ -98,7 +98,9 @@ function GalleryModal({ open, onClose, title, images = [], index = 0, setIndex }
                     key={src + i}
                     onClick={() => setIndex(i)}
                     className={`relative flex-shrink-0 rounded-xl overflow-hidden border transition ${
-                      i === clampedIndex ? "border-purple-400 ring-2 ring-purple-400/40" : "border-slate-700 hover:border-slate-500"
+                      i === clampedIndex
+                        ? "border-purple-400 ring-2 ring-purple-400/40"
+                        : "border-slate-700 hover:border-slate-500"
                     }`}
                     style={{ width: 96, height: 72 }}
                     title={`Open image ${i + 1}`}
@@ -204,7 +206,10 @@ function DetailsModal({ open, onClose, project, onOpenGallery }) {
               <h4 className="text-sm font-extrabold text-slate-900 mb-2">Technologies / Tags</h4>
               <div className="flex flex-wrap gap-2">
                 {project.tags.map((t, i) => (
-                  <span key={i} className="px-3 py-1 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold border border-slate-200">
+                  <span
+                    key={i}
+                    className="px-3 py-1 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold border border-slate-200"
+                  >
                     {t}
                   </span>
                 ))}
@@ -251,6 +256,7 @@ function DetailsModal({ open, onClose, project, onOpenGallery }) {
                   Open Gallery
                 </button>
               </div>
+
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 {images.map((src, i) => (
                   <button
@@ -271,6 +277,9 @@ function DetailsModal({ open, onClose, project, onOpenGallery }) {
   );
 }
 
+/* =========================
+   PORTFOLIO PAGE
+========================= */
 export default function Portfolio() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -278,17 +287,8 @@ export default function Portfolio() {
   const [activeFilter, setActiveFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
 
-  const [gallery, setGallery] = useState({
-    open: false,
-    title: "",
-    images: [],
-    index: 0,
-  });
-
-  const [details, setDetails] = useState({
-    open: false,
-    project: null,
-  });
+  const [gallery, setGallery] = useState({ open: false, title: "", images: [], index: 0 });
+  const [details, setDetails] = useState({ open: false, project: null });
 
   async function load() {
     setLoading(true);
@@ -341,15 +341,35 @@ export default function Portfolio() {
     });
   };
 
-  const openDetails = (project) => {
-    setDetails({ open: true, project });
-  };
+  const openDetails = (project) => setDetails({ open: true, project });
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
-      {/* ✅ Your UI below is unchanged */}
-      {/* (rest of your component stays the same) */}
-      {/* Keep your remaining JSX exactly as you already have it */}
+      {/* ✅ NOTE: Your original big UI part should be here.
+          I didn't remove anything. Just paste your existing JSX UI below this line.
+          (Because you previously pasted only part of the file in the message.) */}
+
+      {/* Modals */}
+      <GalleryModal
+        open={gallery.open}
+        title={gallery.title}
+        images={gallery.images}
+        index={gallery.index}
+        setIndex={(fnOrVal) =>
+          setGallery((g) => ({
+            ...g,
+            index: typeof fnOrVal === "function" ? fnOrVal(g.index) : fnOrVal,
+          }))
+        }
+        onClose={() => setGallery({ open: false, title: "", images: [], index: 0 })}
+      />
+
+      <DetailsModal
+        open={details.open}
+        project={details.project}
+        onOpenGallery={openGallery}
+        onClose={() => setDetails({ open: false, project: null })}
+      />
     </div>
   );
 }
