@@ -55,7 +55,7 @@ const allowedOrigins = new Set();
 if (process.env.FRONTEND_URL) {
   process.env.FRONTEND_URL
     .split(",")
-    .map((u) => u.trim().replace(/\/$/, "")) // remove trailing slash
+    .map((u) => u.trim().replace(/\/$/, ""))
     .filter(Boolean)
     .forEach((u) => allowedOrigins.add(u));
 }
@@ -72,10 +72,10 @@ function isAllowedOrigin(origin) {
   // dev
   if (o.startsWith("http://localhost") || o.startsWith("http://127.0.0.1")) return true;
 
-  // ✅ allow all netlify preview domains
+  // allow Netlify preview domains
   if (o.endsWith(".netlify.app")) return true;
 
-  // ✅ allow all Cloudflare Pages domains
+  // allow Cloudflare Pages domains
   if (o.endsWith(".pages.dev")) return true;
 
   // allow explicit domains from FRONTEND_URL
@@ -94,8 +94,8 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 
-// ✅ Preflight handler (clean)
-app.options("*", cors(corsOptions));
+// ✅ IMPORTANT: DO NOT USE "*" HERE (Render crash). Use regex.
+app.options(/.*/, cors(corsOptions));
 
 /* ======================
    ROUTES
