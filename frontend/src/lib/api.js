@@ -1,6 +1,14 @@
-const API = import.meta.env.VITE_API_BASE || "http://localhost:5000";
+// frontend/src/lib/api.js (or wherever this file is)
+
+const API = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
+const FALLBACK = "http://localhost:5000";
 
 export async function api(path, options = {}) {
+  // Ensure path starts with /
+  const cleanPath = path.startsWith("/") ? path : `/${path}`;
+
+  const base = API || FALLBACK;
+
   const headers = { ...(options.headers || {}) };
 
   const isFormData =
@@ -11,7 +19,63 @@ export async function api(path, options = {}) {
     headers["Content-Type"] = "application/json";
   }
 
-  const res = await fetch(`${API}${path}`, {
+  const res = await fetch(`${base}${cleanPath}`, {
+    ...options,
+    headers,
+  });
+
+  // Try JSON first; fallback to text
+  const text = await res.text();
+  let data = {};
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch {
+    data = { message: text || "Request failed" };
+  }
+
+  if (!res.ok) {
+    throw new Error(data?.message || `Request failed (${res.status})`);
+  }
+
+  return data;
+}
+// frontend/src/lib/api.js
+
+export const API_BASE = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
+
+// ✅ Only allow localhost fallback while developing locally
+const DEV_FALLBACK = "http://localhost:5000";
+const isLocalDev =
+  typeof window !== "undefined" &&
+  (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+
+function getBase() {
+  if (API_BASE) return API_BASE;
+  if (isLocalDev) return DEV_FALLBACK;
+
+  // In production, if env is missing, throw a clear error instead of silently using localhost
+  throw new Error(
+    "VITE_API_URL is not set. Add it in Cloudflare Pages → Settings → Environment variables (Production + Preview)."
+  );
+}
+
+export async function api(path, options = {}) {
+  const base = getBase();
+
+  // Ensure path starts with /
+  const cleanPath = path.startsWith("/") ? path : `/${path}`;
+
+  const headers = { ...(options.headers || {}) };
+
+  const isFormData =
+    typeof FormData !== "undefined" && options.body instanceof FormData;
+
+  // Set JSON header ONLY when body is not FormData and Content-Type not already set
+  if (!isFormData && !headers["Content-Type"]) {
+    headers["Content-Type"] = "application/json";
+  }
+
+  const res = await fetch(`${base}${cleanPath}`, {
     ...options,
     headers,
   });
