@@ -1,5 +1,7 @@
 // backend/src/routes/admin.routes.js
-const router = require("express").Router();
+const express = require("express");
+const router = express.Router();
+
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const multer = require("multer");
@@ -10,17 +12,18 @@ const Portfolio = require("../models/Portfolio");
 const Review = require("../models/Review");
 const Order = require("../models/Order");
 const { requireAdmin } = require("../middleware/auth");
-
 const cloudinary = require("../config/cloudinary");
 
-// ✅ deploy-safe: memory storage (Render friendly)
+/* ======================
+   Upload config (memory) - Render safe
+====================== */
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 25 * 1024 * 1024 }, // 25MB
 });
 
 /* ======================
-   HELPERS
+   Helpers
 ====================== */
 function isValidObjectId(id) {
   return mongoose.Types.ObjectId.isValid(id);
@@ -50,7 +53,7 @@ router.post("/login", async (req, res) => {
     const token = jwt.sign({ id: admin._id }, process.env.JWT_SECRET, { expiresIn: "7d" });
     return res.json({ ok: true, token });
   } catch (e) {
-    return res.status(500).json({ ok: false, message: e.message });
+    return res.status(500).json({ ok: false, message: e.message || "Login failed" });
   }
 });
 
@@ -90,25 +93,29 @@ router.get("/dashboard", requireAdmin, async (req, res) => {
       latestReviews,
     });
   } catch (e) {
-    return res.status(500).json({ ok: false, message: e.message });
+    return res.status(500).json({ ok: false, message: e.message || "Failed to load dashboard" });
   }
 });
 
 /* ======================
-   ✅ ADMIN ORDERS (FIXED)
+   ADMIN ORDERS
 ====================== */
 
-// ✅ LIST ORDERS (includes requirements)
+// ✅ LIST (includes requirements/description)
 router.get("/orders", requireAdmin, async (req, res) => {
   try {
-    const items = await Order.find().sort({ createdAt: -1 }).lean();
+    const items = await Order.find({})
+      .sort({ createdAt: -1 })
+      .select("name businessName email phone packageType budget requirements status createdAt") // ✅ explicit
+      .lean();
+
     return res.json({ ok: true, items });
   } catch (e) {
     return res.status(500).json({ ok: false, message: e.message || "Failed to load orders" });
   }
 });
 
-// ✅ SINGLE ORDER (use this if you want to load full detail separately)
+// ✅ SINGLE ORDER
 router.get("/orders/:id", requireAdmin, async (req, res) => {
   try {
     if (!isValidObjectId(req.params.id)) {
@@ -141,7 +148,9 @@ router.patch("/orders/:id/status", requireAdmin, async (req, res) => {
       req.params.id,
       { $set: { status } },
       { new: true }
-    ).lean();
+    )
+      .select("name businessName email phone packageType budget requirements status createdAt")
+      .lean();
 
     if (!updated) return res.status(404).json({ ok: false, message: "Order not found" });
 
@@ -158,47 +167,61 @@ router.get("/reviews", requireAdmin, async (req, res) => {
   try {
     const items = await Review.find().sort({ createdAt: -1 }).lean();
     return res.json({ ok: true, items });
-  } catch {
-    return res.status(500).json({ ok: false, message: "Failed to load reviews" });
+  } catch (e) {
+    return res.status(500).json({ ok: false, message: e.message || "Failed to load reviews" });
   }
 });
 
 router.patch("/reviews/:id/approve", requireAdmin, async (req, res) => {
   try {
-    if (!isValidObjectId(req.params.id)) return res.status(400).json({ ok: false, message: "Invalid review id" });
+    if (!isValidObjectId(req.params.id)) {
+      return res.status(400).json({ ok: false, message: "Invalid review id" });
+    }
 
-    const item = await Review.findByIdAndUpdate(req.params.id, { $set: { approved: true } }, { new: true }).lean();
+    const item = await Review.findByIdAndUpdate(
+      req.params.id,
+      { $set: { approved: true } },
+      { new: true }
+    ).lean();
+
     if (!item) return res.status(404).json({ ok: false, message: "Review not found" });
-
     return res.json({ ok: true, item });
-  } catch {
-    return res.status(500).json({ ok: false, message: "Failed to approve review" });
+  } catch (e) {
+    return res.status(500).json({ ok: false, message: e.message || "Failed to approve review" });
   }
 });
 
 router.patch("/reviews/:id/hide", requireAdmin, async (req, res) => {
   try {
-    if (!isValidObjectId(req.params.id)) return res.status(400).json({ ok: false, message: "Invalid review id" });
+    if (!isValidObjectId(req.params.id)) {
+      return res.status(400).json({ ok: false, message: "Invalid review id" });
+    }
 
-    const item = await Review.findByIdAndUpdate(req.params.id, { $set: { approved: false } }, { new: true }).lean();
+    const item = await Review.findByIdAndUpdate(
+      req.params.id,
+      { $set: { approved: false } },
+      { new: true }
+    ).lean();
+
     if (!item) return res.status(404).json({ ok: false, message: "Review not found" });
-
     return res.json({ ok: true, item });
-  } catch {
-    return res.status(500).json({ ok: false, message: "Failed to hide review" });
+  } catch (e) {
+    return res.status(500).json({ ok: false, message: e.message || "Failed to hide review" });
   }
 });
 
 router.delete("/reviews/:id", requireAdmin, async (req, res) => {
   try {
-    if (!isValidObjectId(req.params.id)) return res.status(400).json({ ok: false, message: "Invalid review id" });
+    if (!isValidObjectId(req.params.id)) {
+      return res.status(400).json({ ok: false, message: "Invalid review id" });
+    }
 
     const deleted = await Review.findByIdAndDelete(req.params.id);
     if (!deleted) return res.status(404).json({ ok: false, message: "Review not found" });
 
     return res.json({ ok: true });
-  } catch {
-    return res.status(500).json({ ok: false, message: "Failed to delete review" });
+  } catch (e) {
+    return res.status(500).json({ ok: false, message: e.message || "Failed to delete review" });
   }
 });
 
@@ -212,7 +235,7 @@ router.get("/portfolio", requireAdmin, async (req, res) => {
     const skip = (page - 1) * limit;
 
     const filter = {};
-    if (req.query.category) filter.category = req.query.category;
+    if (req.query.category) filter.category = String(req.query.category).trim();
     if (req.query.published === "true") filter.published = true;
     if (req.query.published === "false") filter.published = false;
 
@@ -222,17 +245,19 @@ router.get("/portfolio", requireAdmin, async (req, res) => {
     ]);
 
     return res.json({ ok: true, page, limit, total, pages: Math.ceil(total / limit), items });
-  } catch {
-    return res.status(500).json({ ok: false, message: "Failed to load admin portfolio" });
+  } catch (e) {
+    return res.status(500).json({ ok: false, message: e.message || "Failed to load portfolio" });
   }
 });
 
 /* ======================
-   UPLOAD MEDIA (Cloudinary)
+   PORTFOLIO MEDIA UPLOAD (Cloudinary)
 ====================== */
 router.post("/portfolio/:id/media", requireAdmin, upload.array("files", 10), async (req, res) => {
   try {
-    if (!isValidObjectId(req.params.id)) return res.status(400).json({ ok: false, message: "Invalid portfolio id" });
+    if (!isValidObjectId(req.params.id)) {
+      return res.status(400).json({ ok: false, message: "Invalid portfolio id" });
+    }
 
     const item = await Portfolio.findById(req.params.id);
     if (!item) return res.status(404).json({ ok: false, message: "Portfolio item not found" });
@@ -246,7 +271,9 @@ router.post("/portfolio/:id/media", requireAdmin, upload.array("files", 10), asy
       const mime = String(f.mimetype || "");
       const isVideo = mime.startsWith("video/");
       const isImage = mime.startsWith("image/");
-      if (!isVideo && !isImage) return res.status(400).json({ ok: false, message: "Only images/videos allowed" });
+      if (!isVideo && !isImage) {
+        return res.status(400).json({ ok: false, message: "Only images/videos allowed" });
+      }
 
       const result = await new Promise((resolve, reject) => {
         const stream = cloudinary.uploader.upload_stream(
@@ -268,7 +295,35 @@ router.post("/portfolio/:id/media", requireAdmin, upload.array("files", 10), asy
 
     return res.json({ ok: true, item });
   } catch (e) {
-    return res.status(500).json({ ok: false, message: e.message });
+    return res.status(500).json({ ok: false, message: e.message || "Upload failed" });
+  }
+});
+
+/* ======================
+   DELETE SINGLE MEDIA (Cloudinary)
+====================== */
+router.delete("/portfolio/:id/media", requireAdmin, async (req, res) => {
+  try {
+    if (!isValidObjectId(req.params.id)) {
+      return res.status(400).json({ ok: false, message: "Invalid portfolio id" });
+    }
+
+    const { publicId } = req.body || {};
+    if (!publicId) return res.status(400).json({ ok: false, message: "publicId required" });
+
+    // try both image/video
+    await cloudinary.uploader.destroy(publicId).catch(() => null);
+    await cloudinary.uploader.destroy(publicId, { resource_type: "video" }).catch(() => null);
+
+    const item = await Portfolio.findByIdAndUpdate(
+      req.params.id,
+      { $pull: { media: { publicId } } },
+      { new: true }
+    ).lean();
+
+    return res.json({ ok: true, item });
+  } catch (e) {
+    return res.status(500).json({ ok: false, message: e.message || "Failed to delete media" });
   }
 });
 
