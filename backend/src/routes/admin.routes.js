@@ -132,6 +132,7 @@ router.get("/orders/:id", requireAdmin, async (req, res) => {
 });
 
 // ✅ UPDATE STATUS
+// ✅ UPDATE STATUS (improved)
 router.patch("/orders/:id/status", requireAdmin, async (req, res) => {
   try {
     if (!isValidObjectId(req.params.id)) {
@@ -147,7 +148,7 @@ router.patch("/orders/:id/status", requireAdmin, async (req, res) => {
     const updated = await Order.findByIdAndUpdate(
       req.params.id,
       { $set: { status } },
-      { new: true }
+      { new: true, runValidators: true }
     )
       .select("name businessName email phone packageType budget requirements status createdAt")
       .lean();

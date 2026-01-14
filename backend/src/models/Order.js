@@ -2,6 +2,7 @@
 const mongoose = require("mongoose");
 
 const STATUSES = ["New", "In Progress", "Completed", "Cancelled"];
+const PACKAGES = ["Starter", "Business", "Enterprise"];
 
 const OrderSchema = new mongoose.Schema(
   {
@@ -26,20 +27,35 @@ const OrderSchema = new mongoose.Schema(
       lowercase: true,
       maxlength: 120,
       default: "",
+      validate: {
+        validator: function (v) {
+          if (!v) return true; // optional
+          return /^\S+@\S+\.\S+$/.test(v);
+        },
+        message: "Invalid email address",
+      },
     },
 
+    // ✅ Make phone required because your UI says Phone/WhatsApp *
     phone: {
       type: String,
+      required: true,
       trim: true,
       maxlength: 30,
-      default: "",
+      validate: {
+        validator: function (v) {
+          const cleaned = String(v || "").replace(/\s/g, "");
+          return /^[0-9+]{9,15}$/.test(cleaned);
+        },
+        message: "Invalid phone number",
+      },
     },
 
     packageType: {
       type: String,
       required: true,
       trim: true,
-      enum: ["Starter", "Business", "Enterprise"],
+      enum: PACKAGES,
     },
 
     budget: {
@@ -49,7 +65,7 @@ const OrderSchema = new mongoose.Schema(
       default: "",
     },
 
-    // ✅ This is the "Order Description" / "Requirements"
+    // ✅ "Order Description" / "Requirements"
     requirements: {
       type: String,
       required: true,

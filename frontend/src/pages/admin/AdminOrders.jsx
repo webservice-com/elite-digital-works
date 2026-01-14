@@ -1,29 +1,17 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { api } from "../../lib/api";
 import { getToken } from "../../lib/auth";
 
 const STATUSES = ["New", "In Progress", "Completed", "Cancelled"];
 
-/* ======================
-   Helpers
-====================== */
-function safeText(v) {
-  return String(v ?? "").trim();
-}
-
 function preview(text, max = 90) {
-  const t = safeText(text);
+  const t = String(text || "").trim();
   if (!t) return "-";
   return t.length > max ? t.slice(0, max) + "…" : t;
 }
 
-/* ======================
-   Modal
-====================== */
 function OrderDetailsModal({ open, order, onClose, onChangeStatus }) {
   if (!open || !order) return null;
-
-  const desc = safeText(order.requirements);
 
   return (
     <div
@@ -38,10 +26,11 @@ function OrderDetailsModal({ open, order, onClose, onChangeStatus }) {
         className="relative w-full max-w-3xl rounded-2xl bg-white shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
         <div className="flex items-start justify-between gap-4 p-5 border-b bg-slate-50">
           <div>
-            <h3 className="text-xl font-extrabold text-slate-900">Order Details</h3>
+            <h3 className="text-xl font-extrabold text-slate-900">
+              Order Details
+            </h3>
             <p className="text-sm text-slate-600">
               ID: <span className="font-mono">{order._id}</span>
             </p>
@@ -56,7 +45,6 @@ function OrderDetailsModal({ open, order, onClose, onChangeStatus }) {
           </button>
         </div>
 
-        {/* Body */}
         <div className="p-5 max-h-[75vh] overflow-y-auto space-y-5">
           {/* Customer */}
           <div className="rounded-xl border border-slate-200 p-4">
@@ -66,17 +54,16 @@ function OrderDetailsModal({ open, order, onClose, onChangeStatus }) {
                 <p className="text-slate-500">Name</p>
                 <p className="font-bold text-slate-900">{order.name || "-"}</p>
               </div>
-
               <div>
                 <p className="text-slate-500">Business</p>
-                <p className="font-bold text-slate-900">{order.businessName || "-"}</p>
+                <p className="font-bold text-slate-900">
+                  {order.businessName || "-"}
+                </p>
               </div>
-
               <div>
                 <p className="text-slate-500">Email</p>
                 <p className="font-bold text-slate-900">{order.email || "-"}</p>
               </div>
-
               <div>
                 <p className="text-slate-500">Phone</p>
                 <p className="font-bold text-slate-900">{order.phone || "-"}</p>
@@ -84,16 +71,18 @@ function OrderDetailsModal({ open, order, onClose, onChangeStatus }) {
             </div>
           </div>
 
-          {/* Package */}
+          {/* Package & Status */}
           <div className="rounded-xl border border-slate-200 p-4">
-            <h4 className="font-extrabold text-slate-900 mb-3">Package & Status</h4>
-
+            <h4 className="font-extrabold text-slate-900 mb-3">
+              Package & Status
+            </h4>
             <div className="grid md:grid-cols-2 gap-3 text-sm">
               <div>
                 <p className="text-slate-500">Package</p>
-                <p className="font-bold text-slate-900">{order.packageType || "-"}</p>
+                <p className="font-bold text-slate-900">
+                  {order.packageType || "-"}
+                </p>
               </div>
-
               <div>
                 <p className="text-slate-500">Budget</p>
                 <p className="font-bold text-slate-900">{order.budget || "-"}</p>
@@ -117,22 +106,25 @@ function OrderDetailsModal({ open, order, onClose, onChangeStatus }) {
               <div>
                 <p className="text-slate-500">Created At</p>
                 <p className="font-bold text-slate-900">
-                  {order.createdAt ? new Date(order.createdAt).toLocaleString() : "-"}
+                  {order.createdAt
+                    ? new Date(order.createdAt).toLocaleString()
+                    : "-"}
                 </p>
               </div>
             </div>
           </div>
 
-          {/* Description */}
+          {/* Requirements */}
           <div className="rounded-xl border border-slate-200 p-4">
-            <h4 className="font-extrabold text-slate-900 mb-3">Order Description</h4>
+            <h4 className="font-extrabold text-slate-900 mb-3">
+              Order Description
+            </h4>
             <div className="rounded-lg bg-slate-50 border border-slate-200 p-4 whitespace-pre-line text-sm text-slate-800">
-              {desc ? desc : "—"}
+              {order.requirements?.trim() ? order.requirements : "—"}
             </div>
           </div>
         </div>
 
-        {/* Footer */}
         <div className="p-5 border-t bg-slate-50 flex justify-end">
           <button
             type="button"
@@ -147,45 +139,71 @@ function OrderDetailsModal({ open, order, onClose, onChangeStatus }) {
   );
 }
 
-/* ======================
-   Page
-====================== */
 export default function AdminOrders() {
   const [orders, setOrders] = useState([]);
   const [msg, setMsg] = useState("");
   const [selected, setSelected] = useState(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
-  const [expandedId, setExpandedId] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  const tokenHeader = useMemo(
-    () => ({ Authorization: `Bearer ${getToken()}` }),
-    []
-  );
+  const authHeaders = () => {
+    const token = getToken();
+    if (!token) throw new Error("Admin token missing. Please login again.");
+    return { Authorization: `Bearer ${token}` };
+  };
+
+  const closeModal = () => {
+    setDetailsOpen(false);
+    // optional: keep selected cached or clear it
+    // setSelected(null);
+  };
 
   async function load() {
     setMsg("");
+    setLoading(true);
     try {
       const res = await api("/api/admin/orders", {
-        headers: tokenHeader,
+        headers: authHeaders(),
       });
       setOrders(res.items || []);
     } catch (e) {
+      setOrders([]);
       setMsg(e.message || "Failed to load orders");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function openDetails(order) {
+    setMsg("");
+    try {
+      const full = await api(`/api/admin/orders/${order._id}`, {
+        headers: authHeaders(),
+      });
+      setSelected(full.item);
+      setDetailsOpen(true);
+    } catch (e) {
+      setMsg(e.message || "Failed to load order details");
     }
   }
 
   async function setStatus(id, status) {
     setMsg("");
     try {
-      await api(`/api/admin/orders/${id}/status`, {
+      const res = await api(`/api/admin/orders/${id}/status`, {
         method: "PATCH",
-        headers: tokenHeader,
+        headers: authHeaders(),
         body: JSON.stringify({ status }),
       });
 
-      // ✅ instant UI update
-      setOrders((prev) => prev.map((o) => (o._id === id ? { ...o, status } : o)));
-      setSelected((prev) => (prev?._id === id ? { ...prev, status } : prev));
+      const updated = res?.item;
+      if (!updated) throw new Error("Status updated but no item returned.");
+
+      // update list
+      setOrders((prev) => prev.map((o) => (o._id === id ? updated : o)));
+
+      // update modal selected
+      setSelected((prev) => (prev?._id === id ? updated : prev));
     } catch (e) {
       setMsg(e.message || "Failed to update status");
     }
@@ -193,13 +211,7 @@ export default function AdminOrders() {
 
   useEffect(() => {
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const openDetails = (order) => {
-    setSelected(order);
-    setDetailsOpen(true);
-  };
 
   return (
     <div className="rounded-3xl bg-white border border-slate-200 p-6 shadow-sm">
@@ -227,7 +239,7 @@ export default function AdminOrders() {
       <OrderDetailsModal
         open={detailsOpen}
         order={selected}
-        onClose={() => setDetailsOpen(false)}
+        onClose={closeModal}
         onChangeStatus={setStatus}
       />
 
@@ -238,7 +250,7 @@ export default function AdminOrders() {
               <th className="py-2">Customer</th>
               <th className="py-2">Package</th>
               <th className="py-2">Contact</th>
-              <th className="py-2">Order Description</th>
+              <th className="py-2">Description</th>
               <th className="py-2">Status</th>
               <th className="py-2">Created</th>
               <th className="py-2"></th>
@@ -246,12 +258,14 @@ export default function AdminOrders() {
           </thead>
 
           <tbody>
-            {orders.map((o) => {
-              const full = safeText(o.requirements);
-              const isLong = full.length > 90;
-              const isExpanded = expandedId === o._id;
-
-              return (
+            {loading ? (
+              <tr>
+                <td colSpan={7} className="py-6 text-slate-600">
+                  Loading orders...
+                </td>
+              </tr>
+            ) : (
+              orders.map((o) => (
                 <tr key={o._id} className="border-t align-top">
                   <td className="py-3">
                     <p className="font-bold">{o.name || "-"}</p>
@@ -265,20 +279,10 @@ export default function AdminOrders() {
                     <div>{o.phone || "-"}</div>
                   </td>
 
-                  <td className="py-3 text-slate-700 max-w-[420px]">
+                  <td className="py-3 text-slate-700 max-w-[380px]">
                     <div className="whitespace-pre-line">
-                      {isExpanded ? (full || "-") : preview(o.requirements, 90)}
+                      {preview(o.requirements, 120)}
                     </div>
-
-                    {isLong && (
-                      <button
-                        type="button"
-                        className="mt-2 text-xs font-bold text-slate-900 underline"
-                        onClick={() => setExpandedId(isExpanded ? null : o._id)}
-                      >
-                        {isExpanded ? "Show less" : "Show more"}
-                      </button>
-                    )}
                   </td>
 
                   <td className="py-3">
@@ -309,12 +313,12 @@ export default function AdminOrders() {
                     </button>
                   </td>
                 </tr>
-              );
-            })}
+              ))
+            )}
           </tbody>
         </table>
 
-        {orders.length === 0 && (
+        {!loading && orders.length === 0 && (
           <p className="text-slate-600 mt-4">No orders yet.</p>
         )}
       </div>
