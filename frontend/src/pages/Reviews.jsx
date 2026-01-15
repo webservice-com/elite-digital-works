@@ -254,7 +254,6 @@ export default function Reviews() {
               <div className="flex items-center justify-between mb-6">
                 <div>
                   <h2 className="text-2xl font-bold text-slate-900">Client Reviews</h2>
-                  <p className="text-slate-600">Only approved reviews are displayed</p>
                 </div>
                 <button
                   type="button"
