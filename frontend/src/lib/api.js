@@ -1,65 +1,94 @@
 // frontend/src/lib/api.js
 
-// ✅ Backend base URL (example: https://your-backend.onrender.com)
-// Set this in your hosting Environment Variables as VITE_API_URL
-export const API_BASE = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
-
-// ✅ Optional API key (if your backend requires it)
-// Set this as VITE_API_KEY in hosting Environment Variables
-const API_KEY = import.meta.env.VITE_API_KEY || "";
-
-// ✅ Local dev fallback only when running locally
 const DEV_FALLBACK = "http://localhost:5000";
-const isLocalDev =
-  typeof window !== "undefined" &&
-  (window.location.hostname === "localhost" ||
-    window.location.hostname === "127.0.0.1");
+
+function stripSlashEnd(url) {
+  return String(url || "").replace(/\/+$/, "");
+}
+
+function stripSlashStart(path) {
+  return String(path || "").replace(/^\/+/, "");
+}
+
+function isLocalHost() {
+  if (typeof window === "undefined") return false;
+  const h = window.location.hostname;
+  return h === "localhost" || h === "127.0.0.1";
+}
+
+function getEnvBase() {
+  // supports both names (in case you used VITE_API_BASE_URL earlier)
+  const raw =
+    import.meta.env.VITE_API_URL ||
+    import.meta.env.VITE_API_BASE_URL ||
+    "";
+
+  return stripSlashEnd(raw);
+}
 
 function getBase() {
-  if (API_BASE) return API_BASE;
-  if (isLocalDev) return DEV_FALLBACK;
+  const base = getEnvBase();
 
-  // ✅ Production must have VITE_API_URL set
+  // ✅ If env is set, use it
+  if (base) return base;
+
+  // ✅ Local dev fallback
+  if (isLocalHost()) return DEV_FALLBACK;
+
+  // ✅ Production MUST have env
   throw new Error(
-    "VITE_API_URL is not set. Add it in your hosting Environment Variables (Production + Preview) and redeploy."
+    "API is not configured. Set VITE_API_URL in Cloudflare Pages (Production + Preview) and redeploy."
   );
 }
 
+// Optional API key support
+const API_KEY = import.meta.env.VITE_API_KEY || "";
+
 /**
- * api("/api/admin/portfolio", { method: "POST", body: JSON.stringify(payload) })
- * api("/api/admin/portfolio", { method: "POST", body: formData })
+ * api("/api/admin/portfolio", { method: "POST", body: JSON.stringify(payload), token })
+ * api("/api/admin/portfolio/123/media", { method: "POST", body: formData, token })
  */
 export async function api(path, options = {}) {
   const base = getBase();
-  const cleanPath = path.startsWith("/") ? path : `/${path}`;
+  const cleanPath = stripSlashStart(path);
+  const url = `${base}/${cleanPath}`;
 
   const headers = { ...(options.headers || {}) };
 
-  // ✅ Detect FormData (do NOT set Content-Type manually for it)
+  // token support (you can pass token: "xxx" or use headers yourself)
+  if (options.token && !headers.Authorization) {
+    headers.Authorization = `Bearer ${options.token}`;
+  }
+
+  // API key support
+  if (API_KEY) {
+    headers["x-api-key"] = API_KEY;
+    headers["api_key"] = API_KEY;
+  }
+
   const isFormData =
     typeof FormData !== "undefined" && options.body instanceof FormData;
 
-  // ✅ Attach API key if provided (safe)
-  if (API_KEY) {
-    headers["x-api-key"] = API_KEY;
-    headers["api_key"] = API_KEY; // optional extra (some backends check this)
-  }
-
-  // ✅ JSON requests only
+  // JSON content-type only when not FormData
   if (!isFormData && options.body !== undefined && !headers["Content-Type"]) {
     headers["Content-Type"] = "application/json";
   }
 
-  const res = await fetch(`${base}${cleanPath}`, {
-    ...options,
-    headers,
-    // Optional: include cookies only if you use cookie auth
-    // credentials: "include",
-  });
+  let res;
+  try {
+    res = await fetch(url, {
+      ...options,
+      headers,
+    });
+  } catch (err) {
+    throw new Error(
+      `Network error. Cannot reach API server (${base}). Check backend URL and CORS.`
+    );
+  }
 
-  // Try JSON first, fallback to text
+  // Parse response
   const contentType = res.headers.get("content-type") || "";
-  let data;
+  let data = {};
 
   if (contentType.includes("application/json")) {
     data = await res.json().catch(() => ({}));
@@ -69,8 +98,16 @@ export async function api(path, options = {}) {
   }
 
   if (!res.ok) {
-    throw new Error(data?.message || `Request failed (${res.status})`);
+    const msg =
+      data?.message ||
+      `Request failed (${res.status}) ${res.statusText || ""}`.trim();
+
+    // 🔥 add URL info for easier debugging
+    throw new Error(`${msg} | URL: ${url}`);
   }
 
   return data;
 }
+
+// Export resolved base for media URL building (Portfolio page uses this)
+export const API_BASE = getEnvBase();

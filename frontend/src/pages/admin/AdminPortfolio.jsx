@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { api } from "../../lib/api";
 import { getToken } from "../../lib/auth";
 
@@ -50,11 +50,12 @@ export default function AdminPortfolio() {
   const [busyDeleteId, setBusyDeleteId] = useState(null);
   const [busyToggleId, setBusyToggleId] = useState(null);
 
-  const token = useMemo(() => getToken(), []);
-  const authHeaders = () => {
-    if (!token) return {};
-    return { Authorization: `Bearer ${token}` };
-  };
+  // ✅ IMPORTANT FIX:
+  // Do NOT use useMemo(() => getToken(), [])
+  // Because token changes after login and component won't update.
+  const token = getToken();
+
+  const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
 
   function setError(e, fallback) {
     setMsg({
@@ -69,7 +70,7 @@ export default function AdminPortfolio() {
 
     try {
       const res = await api("/api/admin/portfolio", {
-        headers: authHeaders(),
+        headers: authHeaders,
       });
 
       setItems(res.items || []);
@@ -124,7 +125,7 @@ export default function AdminPortfolio() {
 
       await api(`/api/admin/portfolio/${itemId}/media`, {
         method: "POST",
-        headers: authHeaders(), // don't set Content-Type for FormData
+        headers: authHeaders, // ✅ don't set Content-Type for FormData
         body: fd,
       });
 
@@ -164,7 +165,7 @@ export default function AdminPortfolio() {
 
       await api("/api/admin/portfolio", {
         method: "POST",
-        headers: authHeaders(),
+        headers: authHeaders,
         body: JSON.stringify(payload),
       });
 
@@ -204,7 +205,7 @@ export default function AdminPortfolio() {
     try {
       await api(`/api/admin/portfolio/${id}`, {
         method: "DELETE",
-        headers: authHeaders(),
+        headers: authHeaders,
       });
 
       setMsg({ type: "ok", text: "Deleted." });
@@ -223,7 +224,7 @@ export default function AdminPortfolio() {
     try {
       await api(`/api/admin/portfolio/${item._id}/publish`, {
         method: "PATCH",
-        headers: authHeaders(),
+        headers: authHeaders,
         body: JSON.stringify({ published: !item.published }),
       });
 
