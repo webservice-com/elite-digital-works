@@ -2,26 +2,45 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { api, API_BASE } from "../lib/api";
 
-// ✅ Resolve media URLs coming from backend (e.g. "/uploads/x.jpg")
+/* =========================
+   URL RESOLVER (MEDIA)
+   - handles absolute URLs
+   - handles /uploads/xxx
+   - handles uploads/xxx
+========================= */
 function resolveUrl(u) {
   if (!u) return "";
-  if (u.startsWith("http://") || u.startsWith("https://")) return u;
 
-  // if env not set, return as-is (won't crash, but image may not load)
-  if (!API_BASE) return u;
+  const s = String(u).trim();
+  if (!s) return "";
 
-  const clean = u.startsWith("/") ? u : `/${u}`;
+  // Already absolute (Cloudinary etc.)
+  if (s.startsWith("http://") || s.startsWith("https://")) return s;
+
+  // If API base not set, return as-is (won't crash)
+  if (!API_BASE) return s;
+
+  // Ensure leading slash
+  const clean = s.startsWith("/") ? s : `/${s}`;
   return `${API_BASE}${clean}`;
 }
 
 /* =========================
    GALLERY MODAL (ALL IMAGES)
 ========================= */
-function GalleryModal({ open, onClose, title, images = [], index = 0, setIndex }) {
+function GalleryModal({
+  open,
+  onClose,
+  title,
+  images = [],
+  index = 0,
+  setIndex,
+}) {
   if (!open) return null;
 
   const safeImages = Array.isArray(images) ? images : [];
   const total = safeImages.length;
+
   const clampedIndex = Math.min(Math.max(index, 0), Math.max(total - 1, 0));
   const currentSrc = total ? safeImages[clampedIndex] : "";
 
@@ -29,7 +48,10 @@ function GalleryModal({ open, onClose, title, images = [], index = 0, setIndex }
   const next = () => total > 1 && setIndex((i) => (i + 1) % total);
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+      onClick={onClose}
+    >
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm"></div>
 
       <div
@@ -95,7 +117,9 @@ function GalleryModal({ open, onClose, title, images = [], index = 0, setIndex }
           {total > 0 && (
             <div className="mt-4">
               <div className="flex items-center justify-between mb-2">
-                <p className="text-sm font-semibold text-slate-200">All Images</p>
+                <p className="text-sm font-semibold text-slate-200">
+                  All Images
+                </p>
                 <p className="text-xs text-slate-400">Scroll →</p>
               </div>
 
@@ -113,7 +137,12 @@ function GalleryModal({ open, onClose, title, images = [], index = 0, setIndex }
                     title={`Open image ${i + 1}`}
                     type="button"
                   >
-                    <img src={src} alt={`thumb-${i}`} className="w-full h-full object-cover" loading="lazy" />
+                    <img
+                      src={src}
+                      alt={`thumb-${i}`}
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                    />
                   </button>
                 ))}
               </div>
@@ -122,7 +151,9 @@ function GalleryModal({ open, onClose, title, images = [], index = 0, setIndex }
         </div>
 
         <div className="px-6 py-4 bg-gradient-to-r from-slate-800 to-slate-900 border-t border-slate-700">
-          <p className="text-sm text-slate-400 text-center">Click outside to close</p>
+          <p className="text-sm text-slate-400 text-center">
+            Click outside to close
+          </p>
         </div>
       </div>
     </div>
@@ -136,6 +167,7 @@ function DetailsModal({ open, onClose, project, onOpenGallery }) {
   if (!open || !project) return null;
 
   const media = Array.isArray(project.media) ? project.media : [];
+
   const images = media
     .filter((m) => {
       const t = String(m?.type || "").toLowerCase();
@@ -147,7 +179,10 @@ function DetailsModal({ open, onClose, project, onOpenGallery }) {
   const cover = images[0] || "";
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+      onClick={onClose}
+    >
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm"></div>
 
       <div
@@ -156,7 +191,9 @@ function DetailsModal({ open, onClose, project, onOpenGallery }) {
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-white to-slate-50">
           <div>
-            <p className="text-lg font-extrabold text-slate-900">{project.title}</p>
+            <p className="text-lg font-extrabold text-slate-900">
+              {project.title}
+            </p>
             <div className="mt-1 flex flex-wrap gap-2">
               {project.category && (
                 <span className="px-3 py-1 rounded-full bg-purple-100 text-purple-700 text-xs font-bold">
@@ -188,32 +225,44 @@ function DetailsModal({ open, onClose, project, onOpenGallery }) {
         <div className="max-h-[75vh] overflow-y-auto p-6">
           {cover && (
             <div className="rounded-2xl overflow-hidden border border-slate-200 bg-slate-50">
-              <img src={cover} alt="cover" className="w-full max-h-[45vh] object-contain bg-white" />
+              <img
+                src={cover}
+                alt="cover"
+                className="w-full max-h-[45vh] object-contain bg-white"
+              />
               <div className="p-4 flex flex-wrap gap-2 items-center justify-between">
-                <p className="text-sm text-slate-600">{images.length} Images</p>
-                <div className="flex gap-2">
-                  <button
-                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold hover:from-purple-700 hover:to-pink-700 transition"
-                    onClick={() => onOpenGallery(project.title, images, 0)}
-                    type="button"
-                  >
-                    View All Images
-                  </button>
-                </div>
+                <p className="text-sm text-slate-600">
+                  {images.length} Images
+                </p>
+
+                <button
+                  className="px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold hover:from-purple-700 hover:to-pink-700 transition disabled:opacity-50"
+                  onClick={() => onOpenGallery(project.title, images, 0)}
+                  disabled={images.length === 0}
+                  type="button"
+                >
+                  View All Images
+                </button>
               </div>
             </div>
           )}
 
           {project.summary && (
             <section className="mt-6">
-              <h4 className="text-sm font-extrabold text-slate-900 mb-2">Summary</h4>
-              <p className="text-slate-700 leading-relaxed whitespace-pre-line">{project.summary}</p>
+              <h4 className="text-sm font-extrabold text-slate-900 mb-2">
+                Summary
+              </h4>
+              <p className="text-slate-700 leading-relaxed whitespace-pre-line">
+                {project.summary}
+              </p>
             </section>
           )}
 
           {Array.isArray(project.tags) && project.tags.length > 0 && (
             <section className="mt-6">
-              <h4 className="text-sm font-extrabold text-slate-900 mb-2">Technologies / Tags</h4>
+              <h4 className="text-sm font-extrabold text-slate-900 mb-2">
+                Technologies / Tags
+              </h4>
               <div className="flex flex-wrap gap-2">
                 {project.tags.map((t, i) => (
                   <span
@@ -229,7 +278,9 @@ function DetailsModal({ open, onClose, project, onOpenGallery }) {
 
           {Array.isArray(project.features) && project.features.length > 0 && (
             <section className="mt-6">
-              <h4 className="text-sm font-extrabold text-slate-900 mb-2">Features</h4>
+              <h4 className="text-sm font-extrabold text-slate-900 mb-2">
+                Features
+              </h4>
               <ul className="space-y-2">
                 {project.features.map((f, i) => (
                   <li key={i} className="flex gap-2 text-slate-700">
@@ -243,7 +294,9 @@ function DetailsModal({ open, onClose, project, onOpenGallery }) {
 
           {Array.isArray(project.results) && project.results.length > 0 && (
             <section className="mt-6">
-              <h4 className="text-sm font-extrabold text-slate-900 mb-2">Results</h4>
+              <h4 className="text-sm font-extrabold text-slate-900 mb-2">
+                Results
+              </h4>
               <ul className="space-y-2">
                 {project.results.map((r, i) => (
                   <li key={i} className="flex gap-2 text-slate-700">
@@ -258,7 +311,9 @@ function DetailsModal({ open, onClose, project, onOpenGallery }) {
           {images.length > 0 && (
             <section className="mt-6">
               <div className="flex items-center justify-between mb-3">
-                <h4 className="text-sm font-extrabold text-slate-900">Images</h4>
+                <h4 className="text-sm font-extrabold text-slate-900">
+                  Images
+                </h4>
                 <button
                   className="text-sm font-bold text-purple-600 hover:text-purple-700"
                   onClick={() => onOpenGallery(project.title, images, 0)}
@@ -267,6 +322,7 @@ function DetailsModal({ open, onClose, project, onOpenGallery }) {
                   Open Gallery
                 </button>
               </div>
+
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 {images.map((src, i) => (
                   <button
@@ -276,7 +332,12 @@ function DetailsModal({ open, onClose, project, onOpenGallery }) {
                     title={`Open image ${i + 1}`}
                     type="button"
                   >
-                    <img src={src} alt={`img-${i}`} className="w-full h-36 object-cover" loading="lazy" />
+                    <img
+                      src={src}
+                      alt={`img-${i}`}
+                      className="w-full h-36 object-cover"
+                      loading="lazy"
+                    />
                   </button>
                 ))}
               </div>
@@ -310,9 +371,12 @@ export default function Portfolio() {
   async function load() {
     setLoading(true);
     setError("");
+
     try {
       const res = await api("/api/portfolio?limit=50");
-      setItems(res.items || []);
+      // ✅ extra safety: show only published items on public page
+      const list = (res.items || []).filter((x) => x?.published !== false);
+      setItems(list);
     } catch (e) {
       setError(e.message || "Failed to load portfolio");
     } finally {
@@ -350,10 +414,12 @@ export default function Portfolio() {
   }, [items, activeFilter, searchTerm]);
 
   const openGallery = (title, images, index = 0) => {
+    const safe = Array.isArray(images) ? images : [];
+    if (safe.length === 0) return; // ✅ don't open empty gallery
     setGallery({
       open: true,
       title: title || "Preview",
-      images: Array.isArray(images) ? images : [],
+      images: safe,
       index,
     });
   };
@@ -537,13 +603,15 @@ export default function Portfolio() {
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredItems.map((p) => {
               const media = Array.isArray(p.media) ? p.media : [];
+
               const images = media
                 .filter((m) => {
                   const t = String(m?.type || "").toLowerCase();
                   const u = m?.url;
                   return u && (t === "image" || !m?.type);
                 })
-                .map((m) => resolveUrl(m.url));
+                .map((m) => resolveUrl(m.url))
+                .filter(Boolean);
 
               const cover = images[0] || "";
 
@@ -587,9 +655,13 @@ export default function Portfolio() {
                       )}
                     </div>
 
-                    <h3 className="text-xl font-bold text-slate-900 mb-2 line-clamp-1">{p.title}</h3>
+                    <h3 className="text-xl font-bold text-slate-900 mb-2 line-clamp-1">
+                      {p.title}
+                    </h3>
 
-                    {p.summary && <p className="text-slate-600 mb-4 line-clamp-2">{p.summary}</p>}
+                    {p.summary && (
+                      <p className="text-slate-600 mb-4 line-clamp-2">{p.summary}</p>
+                    )}
 
                     <div className="border-t border-slate-200 pt-4 flex items-center justify-between text-sm">
                       <span className="font-semibold">
@@ -629,10 +701,23 @@ export default function Portfolio() {
       </div>
 
       <style>{`
-        @keyframes scaleIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+        @keyframes scaleIn {
+          from { opacity: 0; transform: scale(0.95); }
+          to   { opacity: 1; transform: scale(1); }
+        }
         .animate-scaleIn { animation: scaleIn 0.2s ease-out; }
-        .line-clamp-1 { overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 1; }
-        .line-clamp-2 { overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+        .line-clamp-1 {
+          overflow: hidden;
+          display: -webkit-box;
+          -webkit-box-orient: vertical;
+          -webkit-line-clamp: 1;
+        }
+        .line-clamp-2 {
+          overflow: hidden;
+          display: -webkit-box;
+          -webkit-box-orient: vertical;
+          -webkit-line-clamp: 2;
+        }
       `}</style>
     </div>
   );

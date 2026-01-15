@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../lib/api";
 import { getToken } from "../../lib/auth";
 
@@ -42,21 +42,39 @@ export default function AdminPortfolio() {
 
   // Upload state
   const [files, setFiles] = useState([]);
-  const [busy, setBusy] = useState(false);
+  const fileInputRef = useRef(null);
+
+  // Busy state (separate)
+  const [busyCreate, setBusyCreate] = useState(false);
+  const [busyUploadId, setBusyUploadId] = useState(null);
+  const [busyDeleteId, setBusyDeleteId] = useState(null);
+  const [busyToggleId, setBusyToggleId] = useState(null);
 
   const token = useMemo(() => getToken(), []);
-  const authHeaders = () => ({ Authorization: `Bearer ${token}` });
+  const authHeaders = () => {
+    if (!token) return {};
+    return { Authorization: `Bearer ${token}` };
+  };
+
+  function setError(e, fallback) {
+    setMsg({
+      type: "err",
+      text: e?.message || fallback,
+    });
+  }
 
   async function load() {
     setLoading(true);
     setMsg({ type: "", text: "" });
+
     try {
       const res = await api("/api/admin/portfolio", {
         headers: authHeaders(),
       });
+
       setItems(res.items || []);
     } catch (e) {
-      setMsg({ type: "err", text: e.message || "Failed to load portfolio" });
+      setError(e, "Failed to load portfolio");
     } finally {
       setLoading(false);
     }
@@ -84,34 +102,39 @@ export default function AdminPortfolio() {
     setFiles(picked);
   }
 
+  function clearFilePicker() {
+    setFiles([]);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  }
+
   async function uploadMedia(itemId) {
     if (!files.length) {
       setMsg({ type: "err", text: "Select images/videos first." });
       return;
     }
 
-    setBusy(true);
+    setBusyUploadId(itemId);
     setMsg({ type: "", text: "" });
 
     try {
       const fd = new FormData();
-      files.forEach((f) => fd.append("files", f)); // ✅ MUST MATCH backend upload.array("files")
+      files.forEach((f) => fd.append("files", f)); // must match upload.array("files")
 
       await api(`/api/admin/portfolio/${itemId}/media`, {
         method: "POST",
-        headers: authHeaders(), // ✅ DON'T set Content-Type
+        headers: authHeaders(), // don't set Content-Type for FormData
         body: fd,
       });
 
       setMsg({ type: "ok", text: "Media uploaded successfully." });
-
-      // Clear file picker state
-      setFiles([]);
+      clearFilePicker();
       await load();
     } catch (e) {
-      setMsg({ type: "err", text: e.message || "Upload failed" });
+      setError(e, "Upload failed");
     } finally {
-      setBusy(false);
+      setBusyUploadId(null);
     }
   }
 
@@ -124,7 +147,8 @@ export default function AdminPortfolio() {
       return;
     }
 
-    setBusy(true);
+    setBusyCreate(true);
+
     try {
       const payload = {
         title: title.trim(),
@@ -140,7 +164,7 @@ export default function AdminPortfolio() {
 
       await api("/api/admin/portfolio", {
         method: "POST",
-        headers: { ...authHeaders(), "Content-Type": "application/json" },
+        headers: authHeaders(),
         body: JSON.stringify(payload),
       });
 
@@ -149,7 +173,7 @@ export default function AdminPortfolio() {
         text: "Portfolio item created. Now select files and click “Upload Media” on that item.",
       });
 
-      // reset form (DO NOT clear selected files)
+      // reset form (do not clear files)
       setTitle("");
       setCategory("Website");
       setIndustry("");
@@ -164,9 +188,9 @@ export default function AdminPortfolio() {
 
       await load();
     } catch (e) {
-      setMsg({ type: "err", text: e.message || "Create failed" });
+      setError(e, "Create failed");
     } finally {
-      setBusy(false);
+      setBusyCreate(false);
     }
   }
 
@@ -174,38 +198,44 @@ export default function AdminPortfolio() {
     const ok = confirm("Delete this portfolio item?");
     if (!ok) return;
 
-    setBusy(true);
+    setBusyDeleteId(id);
     setMsg({ type: "", text: "" });
+
     try {
       await api(`/api/admin/portfolio/${id}`, {
         method: "DELETE",
         headers: authHeaders(),
       });
+
       setMsg({ type: "ok", text: "Deleted." });
       await load();
     } catch (e) {
-      setMsg({ type: "err", text: e.message || "Delete failed" });
+      setError(e, "Delete failed");
     } finally {
-      setBusy(false);
+      setBusyDeleteId(null);
     }
   }
 
   async function togglePublish(item) {
-    setBusy(true);
+    setBusyToggleId(item._id);
     setMsg({ type: "", text: "" });
+
     try {
       await api(`/api/admin/portfolio/${item._id}/publish`, {
         method: "PATCH",
-        headers: { ...authHeaders(), "Content-Type": "application/json" },
+        headers: authHeaders(),
         body: JSON.stringify({ published: !item.published }),
       });
+
       await load();
     } catch (e) {
-      setMsg({ type: "err", text: e.message || "Update failed" });
+      setError(e, "Update failed");
     } finally {
-      setBusy(false);
+      setBusyToggleId(null);
     }
   }
+
+  const anyBusy = busyCreate || busyUploadId || busyDeleteId || busyToggleId;
 
   return (
     <div className="space-y-8">
@@ -243,7 +273,7 @@ export default function AdminPortfolio() {
               onChange={(e) => setTitle(e.target.value)}
               className="mt-1 w-full border border-slate-300 rounded-xl px-4 py-3"
               placeholder="Project title"
-              disabled={busy}
+              disabled={busyCreate}
             />
           </div>
 
@@ -254,7 +284,7 @@ export default function AdminPortfolio() {
               onChange={(e) => setCategory(e.target.value)}
               className="mt-1 w-full border border-slate-300 rounded-xl px-4 py-3"
               placeholder="Website / E-commerce / Landing Page"
-              disabled={busy}
+              disabled={busyCreate}
             />
           </div>
 
@@ -265,7 +295,7 @@ export default function AdminPortfolio() {
               onChange={(e) => setIndustry(e.target.value)}
               className="mt-1 w-full border border-slate-300 rounded-xl px-4 py-3"
               placeholder="Printing / Retail / Education"
-              disabled={busy}
+              disabled={busyCreate}
             />
           </div>
 
@@ -275,7 +305,7 @@ export default function AdminPortfolio() {
                 type="checkbox"
                 checked={published}
                 onChange={(e) => setPublished(e.target.checked)}
-                disabled={busy}
+                disabled={busyCreate}
               />
               Published (visible to customers)
             </label>
@@ -289,7 +319,7 @@ export default function AdminPortfolio() {
             onChange={(e) => setSummary(e.target.value)}
             className="mt-1 w-full border border-slate-300 rounded-xl px-4 py-3 min-h-[120px]"
             placeholder="Short description of the project..."
-            disabled={busy}
+            disabled={busyCreate}
           />
         </div>
 
@@ -302,13 +332,13 @@ export default function AdminPortfolio() {
               onChange={(e) => setTagInput(e.target.value)}
               className="flex-1 border border-slate-300 rounded-xl px-4 py-3"
               placeholder="React, Node, SEO..."
-              disabled={busy}
+              disabled={busyCreate}
             />
             <button
               type="button"
               onClick={() => addToList(tags, setTags, tagInput, setTagInput)}
               className="px-5 rounded-xl bg-slate-900 text-white font-extrabold disabled:opacity-50"
-              disabled={busy}
+              disabled={busyCreate}
             >
               Add
             </button>
@@ -333,7 +363,7 @@ export default function AdminPortfolio() {
               onChange={(e) => setFeatureInput(e.target.value)}
               className="flex-1 border border-slate-300 rounded-xl px-4 py-3"
               placeholder="Admin panel, Payments, SEO..."
-              disabled={busy}
+              disabled={busyCreate}
             />
             <button
               type="button"
@@ -341,7 +371,7 @@ export default function AdminPortfolio() {
                 addToList(features, setFeatures, featureInput, setFeatureInput)
               }
               className="px-5 rounded-xl bg-slate-900 text-white font-extrabold disabled:opacity-50"
-              disabled={busy}
+              disabled={busyCreate}
             >
               Add
             </button>
@@ -366,7 +396,7 @@ export default function AdminPortfolio() {
               onChange={(e) => setResultInput(e.target.value)}
               className="flex-1 border border-slate-300 rounded-xl px-4 py-3"
               placeholder="Faster loading, +30% leads..."
-              disabled={busy}
+              disabled={busyCreate}
             />
             <button
               type="button"
@@ -374,7 +404,7 @@ export default function AdminPortfolio() {
                 addToList(results, setResults, resultInput, setResultInput)
               }
               className="px-5 rounded-xl bg-slate-900 text-white font-extrabold disabled:opacity-50"
-              disabled={busy}
+              disabled={busyCreate}
             >
               Add
             </button>
@@ -396,12 +426,13 @@ export default function AdminPortfolio() {
             Select Images / Videos (for upload step)
           </label>
           <input
+            ref={fileInputRef}
             type="file"
             multiple
             accept="image/*,video/*"
             onChange={onPickFiles}
             className="w-full border border-slate-300 rounded-xl px-4 py-3 bg-white"
-            disabled={busy}
+            disabled={anyBusy}
           />
 
           {files.length > 0 && (
@@ -415,6 +446,15 @@ export default function AdminPortfolio() {
                 ))}
                 {files.length > 6 && <li>+{files.length - 6} more</li>}
               </ul>
+
+              <button
+                type="button"
+                onClick={clearFilePicker}
+                className="mt-2 px-3 py-1 rounded-lg border border-slate-300 bg-white font-bold hover:bg-slate-50"
+                disabled={anyBusy}
+              >
+                Clear selected files
+              </button>
             </div>
           )}
 
@@ -424,10 +464,10 @@ export default function AdminPortfolio() {
         </div>
 
         <button
-          disabled={busy}
+          disabled={busyCreate}
           className="w-full rounded-xl bg-slate-900 text-white font-extrabold py-3 hover:opacity-95 disabled:opacity-50"
         >
-          {busy ? "Saving..." : "Save Portfolio Item"}
+          {busyCreate ? "Saving..." : "Save Portfolio Item"}
         </button>
       </form>
 
@@ -438,7 +478,7 @@ export default function AdminPortfolio() {
           <button
             onClick={load}
             className="px-4 py-2 rounded-xl border border-slate-300 bg-white font-bold hover:bg-slate-50 disabled:opacity-50"
-            disabled={busy}
+            disabled={anyBusy}
           >
             Refresh
           </button>
@@ -471,25 +511,29 @@ export default function AdminPortfolio() {
                     <button
                       onClick={() => togglePublish(p)}
                       className="px-4 py-2 rounded-xl border border-slate-300 bg-white font-bold hover:bg-slate-50 disabled:opacity-50"
-                      disabled={busy}
+                      disabled={anyBusy || busyToggleId === p._id}
                     >
-                      {p.published ? "Unpublish" : "Publish"}
+                      {busyToggleId === p._id
+                        ? "Updating..."
+                        : p.published
+                        ? "Unpublish"
+                        : "Publish"}
                     </button>
 
                     <button
                       onClick={() => uploadMedia(p._id)}
                       className="px-4 py-2 rounded-xl border border-slate-300 bg-white font-bold hover:bg-slate-50 disabled:opacity-50"
-                      disabled={busy}
+                      disabled={anyBusy || busyUploadId === p._id}
                     >
-                      {busy ? "Uploading..." : "Upload Media"}
+                      {busyUploadId === p._id ? "Uploading..." : "Upload Media"}
                     </button>
 
                     <button
                       onClick={() => deleteItem(p._id)}
                       className="px-4 py-2 rounded-xl border border-red-200 bg-red-50 text-red-800 font-extrabold hover:bg-red-100 disabled:opacity-50"
-                      disabled={busy}
+                      disabled={anyBusy || busyDeleteId === p._id}
                     >
-                      Delete
+                      {busyDeleteId === p._id ? "Deleting..." : "Delete"}
                     </button>
                   </div>
 
