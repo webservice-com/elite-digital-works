@@ -11,6 +11,7 @@ const AdminUser = require("../models/AdminUser");
 const Portfolio = require("../models/Portfolio");
 const Review = require("../models/Review");
 const Order = require("../models/Order");
+
 const { requireAdmin } = require("../middleware/auth");
 const cloudinary = require("../config/cloudinary");
 
@@ -60,7 +61,7 @@ router.post("/login", async (req, res) => {
 /* ======================
    ADMIN DASHBOARD SUMMARY
 ====================== */
-router.get("/dashboard", requireAdmin, async (req, res) => {
+router.get("/dashboard", requireAdmin, async (_req, res) => {
   try {
     const [
       totalOrders,
@@ -100,13 +101,11 @@ router.get("/dashboard", requireAdmin, async (req, res) => {
 /* ======================
    ADMIN ORDERS
 ====================== */
-
-// ✅ LIST (includes requirements/description)
-router.get("/orders", requireAdmin, async (req, res) => {
+router.get("/orders", requireAdmin, async (_req, res) => {
   try {
     const items = await Order.find({})
       .sort({ createdAt: -1 })
-      .select("name businessName email phone packageType budget requirements status createdAt") // ✅ explicit
+      .select("name businessName email phone packageType budget requirements status createdAt")
       .lean();
 
     return res.json({ ok: true, items });
@@ -115,7 +114,6 @@ router.get("/orders", requireAdmin, async (req, res) => {
   }
 });
 
-// ✅ SINGLE ORDER
 router.get("/orders/:id", requireAdmin, async (req, res) => {
   try {
     if (!isValidObjectId(req.params.id)) {
@@ -131,8 +129,6 @@ router.get("/orders/:id", requireAdmin, async (req, res) => {
   }
 });
 
-// ✅ UPDATE STATUS
-// ✅ UPDATE STATUS (improved)
 router.patch("/orders/:id/status", requireAdmin, async (req, res) => {
   try {
     if (!isValidObjectId(req.params.id)) {
@@ -164,7 +160,7 @@ router.patch("/orders/:id/status", requireAdmin, async (req, res) => {
 /* ======================
    ADMIN REVIEWS
 ====================== */
-router.get("/reviews", requireAdmin, async (req, res) => {
+router.get("/reviews", requireAdmin, async (_req, res) => {
   try {
     const items = await Review.find().sort({ createdAt: -1 }).lean();
     return res.json({ ok: true, items });
@@ -227,8 +223,10 @@ router.delete("/reviews/:id", requireAdmin, async (req, res) => {
 });
 
 /* ======================
-   ADMIN PORTFOLIO LIST
+   ADMIN PORTFOLIO
 ====================== */
+
+// ✅ LIST (already existed, kept)
 router.get("/portfolio", requireAdmin, async (req, res) => {
   try {
     const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
@@ -245,9 +243,101 @@ router.get("/portfolio", requireAdmin, async (req, res) => {
       Portfolio.countDocuments(filter),
     ]);
 
-    return res.json({ ok: true, page, limit, total, pages: Math.ceil(total / limit), items });
+    return res.json({
+      ok: true,
+      page,
+      limit,
+      total,
+      pages: Math.ceil(total / limit),
+      items,
+    });
   } catch (e) {
     return res.status(500).json({ ok: false, message: e.message || "Failed to load portfolio" });
+  }
+});
+
+// ✅ CREATE (MISSING BEFORE)  <<< THIS FIXES YOUR ERROR
+router.post("/portfolio", requireAdmin, async (req, res) => {
+  try {
+    const {
+      title,
+      category = "Website",
+      industry = "",
+      summary = "",
+      published = true,
+      tags = [],
+      features = [],
+      results = [],
+      media = [],
+    } = req.body || {};
+
+    if (!String(title || "").trim()) {
+      return res.status(400).json({ ok: false, message: "Title is required" });
+    }
+
+    const item = await Portfolio.create({
+      title: String(title).trim(),
+      category: String(category || "Website").trim(),
+      industry: String(industry || "").trim(),
+      summary: String(summary || "").trim(),
+      published: Boolean(published),
+      tags: Array.isArray(tags) ? tags.map(String) : [],
+      features: Array.isArray(features) ? features.map(String) : [],
+      results: Array.isArray(results) ? results.map(String) : [],
+      media: Array.isArray(media) ? media : [],
+    });
+
+    return res.json({ ok: true, item });
+  } catch (e) {
+    return res.status(500).json({ ok: false, message: e.message || "Create failed" });
+  }
+});
+
+// ✅ TOGGLE PUBLISH (MISSING BEFORE)
+router.patch("/portfolio/:id/publish", requireAdmin, async (req, res) => {
+  try {
+    if (!isValidObjectId(req.params.id)) {
+      return res.status(400).json({ ok: false, message: "Invalid portfolio id" });
+    }
+
+    const { published } = req.body || {};
+    const item = await Portfolio.findByIdAndUpdate(
+      req.params.id,
+      { $set: { published: Boolean(published) } },
+      { new: true }
+    ).lean();
+
+    if (!item) return res.status(404).json({ ok: false, message: "Portfolio item not found" });
+
+    return res.json({ ok: true, item });
+  } catch (e) {
+    return res.status(500).json({ ok: false, message: e.message || "Update failed" });
+  }
+});
+
+// ✅ DELETE ITEM (MISSING BEFORE)
+router.delete("/portfolio/:id", requireAdmin, async (req, res) => {
+  try {
+    if (!isValidObjectId(req.params.id)) {
+      return res.status(400).json({ ok: false, message: "Invalid portfolio id" });
+    }
+
+    const item = await Portfolio.findById(req.params.id);
+    if (!item) return res.status(404).json({ ok: false, message: "Portfolio item not found" });
+
+    // optional: delete cloudinary media too
+    const media = Array.isArray(item.media) ? item.media : [];
+    for (const m of media) {
+      const publicId = m?.publicId;
+      if (!publicId) continue;
+      await cloudinary.uploader.destroy(publicId).catch(() => null);
+      await cloudinary.uploader.destroy(publicId, { resource_type: "video" }).catch(() => null);
+    }
+
+    await Portfolio.findByIdAndDelete(req.params.id);
+    return res.json({ ok: true });
+  } catch (e) {
+    return res.status(500).json({ ok: false, message: e.message || "Delete failed" });
   }
 });
 
@@ -312,7 +402,6 @@ router.delete("/portfolio/:id/media", requireAdmin, async (req, res) => {
     const { publicId } = req.body || {};
     if (!publicId) return res.status(400).json({ ok: false, message: "publicId required" });
 
-    // try both image/video
     await cloudinary.uploader.destroy(publicId).catch(() => null);
     await cloudinary.uploader.destroy(publicId, { resource_type: "video" }).catch(() => null);
 
