@@ -98,7 +98,7 @@ export default function Pricing() {
           <div className="text-center max-w-3xl mx-auto">
             <div className="inline-flex items-center gap-2 mb-4 px-4 py-2 bg-green-50 text-green-700 rounded-full text-sm font-semibold">
               <FaStar className="text-amber-500" />
-              Limited Time Offer - 50% OFF
+              Limited Time Offer - 15% OFF
             </div>
             
             <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4 leading-tight">
@@ -106,7 +106,7 @@ export default function Pricing() {
             </h1>
             
             <p className="text-lg text-gray-600 leading-relaxed">
-              Get professional websites at 50% off for a limited time. 
+              Get professional websites at 15% off for a limited time. 
               Transparent pricing with no hidden costs. Choose your package and start building today.
             </p>
           </div>
