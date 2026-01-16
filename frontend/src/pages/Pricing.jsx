@@ -10,8 +10,8 @@ import {
 const PACKAGES = [
   {
     name: "Starter",
-    price: "$149",
-    originalPrice: "$299",
+    price: "$249",
+    originalPrice: "$295",
     tagline: "Perfect for new brands & simple launches",
     icon: <FaRocket className="text-blue-600" />,
     color: "blue",
@@ -30,8 +30,8 @@ const PACKAGES = [
   },
   {
     name: "Business",
-    price: "$349",
-    originalPrice: "$699",
+    price: "$529",
+    originalPrice: "$625",
     tagline: "Best for growing businesses",
     icon: <FaChartLine className="text-purple-600" />,
     color: "purple",
@@ -52,7 +52,7 @@ const PACKAGES = [
   },
   {
     name: "Enterprise",
-    price: "Custom",
+    price: "Starting $1200",
     tagline: "For scalable systems & advanced features",
     icon: <FaCrown className="text-amber-600" />,
     color: "amber",
@@ -179,7 +179,7 @@ export default function Pricing() {
                 {/* Discount Ribbon */}
                 {p.originalPrice && (
                   <div className="absolute -right-2 top-6 bg-gradient-to-r from-green-500 to-emerald-600 text-white px-4 py-1 rounded-l-lg font-bold text-sm shadow-lg">
-                    SAVE 50%
+                    SAVE 15%
                   </div>
                 )}
 
