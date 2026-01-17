@@ -11,7 +11,7 @@ import {
 const PACKAGES = [
   {
     name: "Starter",
-    price: "$149",
+    price: "249",
     desc: "Perfect for new brands & simple launches",
     icon: <FaRocket className="text-blue-600" />,
     color: "border-blue-200 bg-blue-50",
@@ -27,7 +27,7 @@ const PACKAGES = [
   },
   {
     name: "Business",
-    price: "$349",
+    price: "$529",
     desc: "Best for growing businesses",
     icon: <FaChartLine className="text-purple-600" />,
     color: "border-purple-200 bg-purple-50",
@@ -45,7 +45,7 @@ const PACKAGES = [
   },
   {
     name: "Enterprise",
-    price: "Custom",
+    price: "Starting $1200",
     desc: "For advanced needs & custom systems",
     icon: <FaCrown className="text-amber-600" />,
     color: "border-amber-200 bg-amber-50",
