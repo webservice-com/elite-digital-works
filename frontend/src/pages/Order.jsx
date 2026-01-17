@@ -11,7 +11,7 @@ import {
 const PACKAGES = [
   {
     name: "Starter",
-    price: "249",
+    price: "$249",
     desc: "Perfect for new brands & simple launches",
     icon: <FaRocket className="text-blue-600" />,
     color: "border-blue-200 bg-blue-50",
