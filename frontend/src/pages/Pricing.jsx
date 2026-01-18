@@ -311,7 +311,7 @@ export default function Pricing() {
               },
               {
                 q: "Is hosting included?",
-                a: "Hosting is included for one year.",
+                a: "Hosting is not included. If you need hosting, it is available at $60 per year, billed annually. is included for one year.",
               },
               {
                 q: "Do you provide source files?",
