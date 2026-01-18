@@ -303,7 +303,7 @@ export default function Pricing() {
               },
               {
                 q: "Do you offer payment plans?",
-                a: "Yes! We offer flexible payment options: 15% upfront and 15% upon completion.",
+                a: "Yes! We offer flexible payment options: 50% upfront and 50% upon completion.",
               },
               {
                 q: "What if I need more features later?",
