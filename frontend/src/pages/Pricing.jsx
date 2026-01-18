@@ -298,20 +298,20 @@ export default function Pricing() {
           <div className="grid md:grid-cols-2 gap-6">
             {[
               {
-                q: "How long does the 50% discount last?",
+                q: "How long does the 15% discount last?",
                 a: "This special pricing is available for the next 30 days only. We recommend booking your spot early.",
               },
               {
                 q: "Do you offer payment plans?",
-                a: "Yes! We offer flexible payment options: 50% upfront and 50% upon completion.",
+                a: "Yes! We offer flexible payment options: 15% upfront and 15% upon completion.",
               },
               {
                 q: "What if I need more features later?",
-                a: "All packages can be upgraded. We'll apply the 50% discount to any additional features added.",
+                a: "All packages can be upgraded. We'll apply the 15% discount to any additional features added.",
               },
               {
                 q: "Is hosting included?",
-                a: "Hosting is not included, but we help you set it up and offer recommendations.",
+                a: "Hosting is included for one year.",
               },
               {
                 q: "Do you provide source files?",
@@ -349,7 +349,7 @@ export default function Pricing() {
               Ready to Transform Your Online Presence?
             </h3>
             <p className="text-slate-300 mb-8 max-w-2xl mx-auto">
-              Get your premium website at 50% off before this limited-time offer ends.
+              Get your premium website at 15% off before this limited-time offer ends.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
